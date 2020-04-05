@@ -1,0 +1,8 @@
+kasa:
+  url: https://wap.tplinkcloud.com
+  user:
+  pass:
+  terminal:
+  app_type: Kasa_Android
+  deviceId:
+  requestData: "{\"system\":{\"set_relay_state\":{\"state\":1}}}"
