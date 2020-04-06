@@ -16,7 +16,7 @@ All responses will have the form
 Subsequent response definitions will only detail the expected value of the `data` field
 
 
-## Check-in
+### Check-in
 Notify J.A.R.V.I.S. you entered a location
 
 **Definition**

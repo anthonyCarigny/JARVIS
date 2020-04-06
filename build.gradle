@@ -36,6 +36,8 @@ dependencies {
 	testImplementation 'io.projectreactor:reactor-test'
 	testImplementation 'io.rest-assured:spring-web-test-client:4.3.0'
 	testImplementation 'org.mock-server:mockserver-junit-jupiter:5.10.0'
+
+	compile 'org.modelmapper.extensions:modelmapper-spring:2.3.0'
 }
 
 test {

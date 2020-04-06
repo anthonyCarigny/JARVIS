@@ -10,6 +10,6 @@ import lombok.NoArgsConstructor;
 public class Device {
   private String identifier; //a globally unique identifier for this device
   private String name; // a friendly name for this device
-  private String device_type; //the type of the device as understood by the client
+  private DeviceType device_type; //the type of the device as understood by the client
   private String controller_gateway; //the address of the device's controller
 }

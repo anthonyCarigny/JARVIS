@@ -4,5 +4,9 @@ kasa:
   pass:
   terminal:
   app_type: Kasa_Android
-  deviceId:
-  requestData: "{\"system\":{\"set_relay_state\":{\"state\":1}}}"
+logging:
+  level:
+    reactor:
+      netty:
+        http:
+          client: DEBUG
