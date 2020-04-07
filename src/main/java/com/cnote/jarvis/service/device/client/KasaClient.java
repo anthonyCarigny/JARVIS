@@ -35,7 +35,7 @@ public class KasaClient {
   }
 
   @Scheduled(cron = "0 0 0 0 * ?")
-  @Cacheable
+  @Cacheable("token")
   public Mono<String> getToken() {
     log.debug("URL : {}", url);
     KasaRequest kasaRequest = new KasaRequest("login", loginParams);
@@ -50,8 +50,7 @@ public class KasaClient {
         .flatMap(loginResponse -> Mono.just(loginResponse.getResult().getToken()));
   }
 
-
-  @Cacheable
+  @Cacheable("devices")
   public Flux<Device> getDevices() {
     KasaRequest kasaRequest = KasaRequest.builder().method("getDeviceList").build();
     log.info(kasaRequest.toString());
@@ -68,13 +67,13 @@ public class KasaClient {
                     .doOnSuccess(deviceListResponse -> log.info(deviceListResponse.toString()))
                     .flatMap(deviceListResponse -> Mono.justOrEmpty(deviceListResponse.getResult()))
                     .filter(Objects::nonNull)
-                    .flatMapIterable(deviceListResult -> deviceListResult.getDeviceList()));
+                    .flatMapIterable(DeviceListResult::getDeviceList));
   }
 
   private Mono<Integer> passThrough(Device device, int state) {
     PassThroughParams passThroughParams =
         new PassThroughParams(
-            device.getDeviceId(), "{\"system\":{\"set_relay_state\":{\"state\":"+state+"}}}");
+            device.getDeviceId(), "{\"system\":{\"set_relay_state\":{\"state\":" + state + "}}}");
     KasaRequest kasaRequest = new KasaRequest("passthrough", passThroughParams);
     log.debug(kasaRequest.toString());
     HttpClient httpClient = HttpClient.create().wiretap(true);
@@ -100,31 +99,27 @@ public class KasaClient {
 
   public Flux<Boolean> turnOnEverything() {
     return getDevices()
-            .flatMap(device -> turnOnDevice(device))
-            .flatMap(
-                    error_code -> {
-                      if (error_code == 0) {
-                        return Mono.just(true);
-                      }
-                      return Mono.just(false);
-                    });
+        .flatMap(this::turnOnDevice)
+        .flatMap(
+            error_code -> {
+              if (error_code == 0) {
+                return Mono.just(true);
+              }
+              return Mono.just(false);
+            });
   }
+
   public Flux<Boolean> turnOffEverything() {
     return getDevices()
-            .flatMap(device -> turnOffDevice(device))
-            .flatMap(
-                    error_code -> {
-                      if (error_code == 0) {
-                        return Mono.just(true);
-                      }
-                      return Mono.just(false);
-                    });
+        .flatMap(this::turnOffDevice)
+        .flatMap(error_code -> error_code == 0 ? Mono.just(true) : Mono.just(false));
   }
 
   private Mono<Integer> turnOnDevice(Device device) {
-    return passThrough(device,1);
+    return passThrough(device, 1);
   }
+
   private Mono<Integer> turnOffDevice(Device device) {
-    return passThrough(device,0);
+    return passThrough(device, 0);
   }
 }

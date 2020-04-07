@@ -2,39 +2,33 @@ package com.cnote.jarvis.client;
 
 import com.cnote.jarvis.service.device.client.KasaClient;
 import com.cnote.jarvis.service.device.client.model.Device;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import io.restassured.RestAssured;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.mockserver.integration.ClientAndServer;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
 import org.mockserver.model.MediaType;
-import org.mockserver.model.Parameter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.http.HttpMethod;
 import org.springframework.util.Assert;
+import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
+import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockserver.model.StringBody.subString;
 
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {"kasa.url=http://localhost:8089", "device.gateway=http://localhost:8089"})
+    properties = {"kasa.url=http://localhost:8089"})
 public class KasaClientTest {
 
-  @LocalServerPort int randomPort;
-  private static ClientAndServer mockServer;
   @Autowired KasaClient kasaClient;
+  private static ClientAndServer mockServer;
+  private static String TOKEN = "49bb4438-B7WDpGHKGvgGvne6wK55MB1";
 
-  @BeforeEach
-  void beforeEach() {
-    RestAssured.port = randomPort;
+  @BeforeAll
+  static void beforeAll() {
     mockServer = ClientAndServer.startClientAndServer(8089);
   }
 
@@ -49,33 +43,58 @@ public class KasaClientTest {
   }
 
   @Test
-  public void shouldLoginWithTheRightParameters() throws JsonProcessingException {
-    mockServer
-        .when(
-            HttpRequest.request()
-                .withMethod(HttpMethod.POST.name())
-                .withBody(subString("\"method\":\"login\",")))
-        .respond(
-            HttpResponse.response(
-                    "{\n"
-                        + "    \"error_code\": 0,\n"
-                        + "    \"result\": {\n"
-                        + "        \"accountId\": \"7916597\",\n"
-                        + "        \"regTime\": \"2019-11-06 21:19:06\",\n"
-                        + "        \"email\": \"anthony.carigny@gmail.com\",\n"
-                        + "        \"token\": \"49bb4438-B7WDpGHKGvgGvne6wK55MB0\"\n"
-                        + "    }\n"
-                        + "}")
-                .withContentType(MediaType.APPLICATION_JSON));
-    kasaClient.getToken().block();
+  public void login() {
+    mockKasaLoginResponse();
+    String token = kasaClient.getToken().block();
     mockServer.verify(
         HttpRequest.request()
             .withMethod(HttpMethod.POST.name())
             .withBody(subString("\"method\":\"login\",")));
+    assertEquals(TOKEN, token);
   }
 
   @Test
-  public void shouldPostPassThroughWithTheRightParameters() {
+  public void getDevice() {
+    mockKasaLoginResponse();
+    mockKasaGetDeviceListResponse();
+    Mono<List<Device>> deviceList = kasaClient.getDevices().collectList();
+    List<Device> devices = deviceList.block();
+    mockServer.verify(
+            HttpRequest.request(),
+            HttpRequest.request());
+    Assert.notEmpty(devices, "should have at least one device");
+  }
+
+  @Test
+  public void passThroughSuccess() {
+    mockKasaLoginResponse();
+    mockKasaGetDeviceListResponse();
+    mockKasaPassThroughResponse();
+    Boolean turnedOn = kasaClient.turnOnEverything().blockFirst();
+    mockServer.verify(
+            HttpRequest.request(),
+            HttpRequest.request(),
+            HttpRequest.request()
+                    .withMethod(HttpMethod.POST.name())
+                    .withBody(subString("\"method\":\"passthrough\"")));
+    assertEquals(Boolean.TRUE, turnedOn);
+  }
+  @Test
+  public void passThroughFailure() {
+    mockKasaLoginResponse();
+    mockKasaGetDeviceListResponse();
+    mockKasaPassThroughError();
+    Boolean turnedOn = kasaClient.turnOnEverything().blockFirst();
+    mockServer.verify(
+            HttpRequest.request(),
+            HttpRequest.request(),
+            HttpRequest.request()
+                    .withMethod(HttpMethod.POST.name())
+                    .withBody(subString("\"method\":\"passthrough\"")));
+    assertEquals(Boolean.FALSE, turnedOn);
+  }
+
+  private void mockKasaLoginResponse() {
     mockServer
         .when(
             HttpRequest.request()
@@ -86,58 +105,23 @@ public class KasaClientTest {
                     "{\n"
                         + "    \"error_code\": 0,\n"
                         + "    \"result\": {\n"
-                        + "        \"accountId\": \"7916597\",\n"
+                        + "        \"accountId\": \"1234567\",\n"
                         + "        \"regTime\": \"2019-11-06 21:19:06\",\n"
-                        + "        \"email\": \"anthony.carigny@gmail.com\",\n"
-                        + "        \"token\": \"49bb4438-B7WDpGHKGvgGvne6wK55MB0\"\n"
+                        + "        \"email\": \"email@example.com\",\n"
+                        + "        \"token\": \""
+                        + TOKEN
+                        + "\"\n"
                         + "    }\n"
                         + "}")
                 .withContentType(MediaType.APPLICATION_JSON));
+  }
 
+  private void mockKasaGetDeviceListResponse() {
     mockServer
         .when(
             HttpRequest.request()
-                .withQueryStringParameter("token", "49bb4438-B7WDpGHKGvgGvne6wK55MB0")
-                .withMethod(HttpMethod.POST.name()))
-        .respond(
-            HttpResponse.response(
-                    "{\"error_code\":0,\n"
-                        + "  \"result\": {\n"
-                        + "    \"responseData\": \"ok\""
-                        + "  }\n"
-                        + "}")
-                .withContentType(MediaType.APPLICATION_JSON));
-
-    kasaClient.turnOnEverything().blockLast();
-    mockServer.verify(
-        HttpRequest.request()
-            .withMethod(HttpMethod.POST.name())
-            .withBody(subString("\"method\":\"passthrough\",")));
-  }
-
-  @Test
-  public void shouldgetDevicesWithTheRightParameters() {
-    mockServer
-            .when(
-                    HttpRequest.request()
-                            .withMethod(HttpMethod.POST.name())
-                            .withBody(subString("\"method\":\"login\",")))
-            .respond(
-                    HttpResponse.response(
-                            "{\n"
-                                    + "    \"error_code\": 0,\n"
-                                    + "    \"result\": {\n"
-                                    + "        \"accountId\": \"7916597\",\n"
-                                    + "        \"regTime\": \"2019-11-06 21:19:06\",\n"
-                                    + "        \"email\": \"anthony.carigny@gmail.com\",\n"
-                                    + "        \"token\": \"49bb4438-B7WDpGHKGvgGvne6wK55MB0\"\n"
-                                    + "    }\n"
-                                    + "}")
-                            .withContentType(MediaType.APPLICATION_JSON));
-
-    mockServer
-        .when(HttpRequest.request().withMethod(HttpMethod.POST.name())
-                .withBody(subString("\"method\":\"getDeviceList\",")))
+                .withMethod(HttpMethod.POST.name())
+                .withBody(subString("\"method\":\"getDeviceList\"")))
         .respond(
             HttpResponse.response(
                     "{\n"
@@ -148,16 +132,16 @@ public class KasaClientTest {
                         + "                \"deviceType\": \"IOT.SMARTPLUGSWITCH\",\n"
                         + "                \"role\": 0,\n"
                         + "                \"fwVer\": \"1.5.8 Build 180815 Rel.135935\",\n"
-                        + "                \"appServerUrl\": \"https://eu-wap.tplinkcloud.com\",\n"
+                        + "                \"appServerUrl\": \"http://localhost:8089\",\n"
                         + "                \"deviceRegion\": \"eu-west-1\",\n"
-                        + "                \"deviceId\": \"800633CAADA975DBDF2B5C4CA61913781AE712B2\",\n"
+                        + "                \"deviceId\": \"azertyuiopqsdfghjklmwxcvbn123456789\",\n"
                         + "                \"deviceName\": \"Smart Wi-Fi Plug\",\n"
                         + "                \"deviceHwVer\": \"2.1\",\n"
                         + "                \"alias\": \"Living Room Lamp\",\n"
                         + "                \"deviceMac\": \"B0BE76D8AD5D\",\n"
-                        + "                \"oemId\": \"FDD18403D5E8DB3613009C820963E018\",\n"
+                        + "                \"oemId\": \"987654321NBVCXWMLKJHGFDSQPOIUYTREZA\",\n"
                         + "                \"deviceModel\": \"HS100(UK)\",\n"
-                        + "                \"hwId\": \"82589DCE59161C80EC57E0A2834D25A2\",\n"
+                        + "                \"hwId\": \"AZERTYUIOPQSDFGHJKLMXCVBN123456789\",\n"
                         + "                \"fwId\": \"00000000000000000000000000000000\",\n"
                         + "                \"isSameRegion\": true,\n"
                         + "                \"status\": 1\n"
@@ -165,12 +149,40 @@ public class KasaClientTest {
                         + "        ]\n"
                         + "    }\n"
                         + "}")
-                .withContentType(MediaType.APPLICATION_JSON));
-    ArrayList<Device> devices = kasaClient.getDevices().block();
-    mockServer.verify(
-        HttpRequest.request()
-            .withMethod(HttpMethod.POST.name())
-            .withBody(subString("\"method\":\"getDeviceList\",")));
-    Assert.notEmpty(devices, "should have at least one device");
+                .withContentType(MediaType.APPLICATION_JSON)
+        );
   }
+
+  private void mockKasaPassThroughResponse() {
+    mockServer
+            .when(
+                    HttpRequest.request()
+                            .withMethod(HttpMethod.POST.name())
+                            .withQueryStringParameter("token", TOKEN)
+                            .withBody(subString("\"method\":\"passthrough\"")))
+            .respond(
+                    HttpResponse.response(
+                            "{\"error_code\":0,\n"
+                                    + "  \"result\": {\n"
+                                    + "    \"responseData\": \"ok\""
+                                    + "  }\n"
+                                    + "}")
+                            .withContentType(MediaType.APPLICATION_JSON));
+  }
+  private void mockKasaPassThroughError() {
+    mockServer
+        .when(
+            HttpRequest.request()
+                .withMethod(HttpMethod.POST.name())
+                .withQueryStringParameter("token", TOKEN)
+                .withBody(subString("\"method\":\"passthrough\"")))
+        .respond(
+            HttpResponse.response(
+                    "{\n"
+                        + "    \"error_code\": -20651,\n"
+                        + "    \"msg\": \"Token expired\"\n"
+                        + "}")
+                .withContentType(MediaType.APPLICATION_JSON));
+  }
+
 }
