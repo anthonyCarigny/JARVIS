@@ -1,7 +1,7 @@
 package com.cnote.jarvis.client;
 
 import com.cnote.jarvis.service.device.client.KasaClient;
-import com.cnote.jarvis.service.device.client.model.Device;
+import com.cnote.jarvis.service.device.client.model.KasaDevice;
 import org.junit.jupiter.api.*;
 import org.mockserver.integration.ClientAndServer;
 import org.mockserver.model.HttpRequest;
@@ -57,8 +57,8 @@ public class KasaClientTest {
   public void getDevice() {
     mockKasaLoginResponse();
     mockKasaGetDeviceListResponse();
-    Mono<List<Device>> deviceList = kasaClient.getDevices().collectList();
-    List<Device> devices = deviceList.block();
+    Mono<List<KasaDevice>> deviceList = kasaClient.getDevices().collectList();
+    List<KasaDevice> devices = deviceList.block();
     mockServer.verify(
             HttpRequest.request(),
             HttpRequest.request());

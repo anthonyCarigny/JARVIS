@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class Device {
+public class KasaDevice {
     private String deviceType;
     private String role;
     private String fwVer;
