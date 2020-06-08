@@ -3,9 +3,9 @@ spring:
     name: J.A.R.V.I.S.
 kasa:
   url: https://wap.tplinkcloud.com
-  user:
-  pass:
-  terminal:
+  user: YOUR_KASA_USER
+  pass: YOUR_KASA_PASSWORD
+  terminal: DEVICE_IDENTIFIER
   app_type: Kasa_Android
 logging:
   level:
