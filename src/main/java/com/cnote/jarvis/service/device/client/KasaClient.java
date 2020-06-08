@@ -24,11 +24,10 @@ public class KasaClient {
   private WebClient client;
   @Autowired LoginParams loginParams;
 
-  public KasaClient(@Value("${kasa.url}") String url) {
+  public KasaClient(@Value("${kasa.url}") String url, WebClient.Builder webclientBuilder) {
     this.url = url;
     HttpClient httpClient = HttpClient.create().wiretap(true);
-    this.client =
-        WebClient.builder()
+    this.client = webclientBuilder
             .clientConnector(new ReactorClientHttpConnector(httpClient))
             .baseUrl(url)
             .build();

@@ -1,3 +1,6 @@
+spring:
+  application:
+    name: J.A.R.V.I.S.
 kasa:
   url: https://wap.tplinkcloud.com
   user:

@@ -1,4 +1,4 @@
-package com.cnote.jarvis.controller;
+package com.cnote.jarvis.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
